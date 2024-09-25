@@ -38,8 +38,102 @@ def loadEnds(app, hby, vdb, tvy, vry):
     app.add_route("/health", healthEnd)
     credEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry)
     app.add_route("/presentations/{said}", credEnd)
-
+    verifierEnd = VerifierResourceEndpoint(hby, vdb, tvy, vry)
+    app.add_route("/verifier", verifierEnd)
     return []
+
+
+class VerifierResourceEndpoint:
+    """ CESR verifier resource endpoint class
+
+    This class allows for a POST to a VERIFY endpoint to trigger CESR credential verification.
+
+    """
+
+    def __init__(self, hby, vdb, tvy, vry):
+        """ Create CESR verifier resource endpoint instance
+
+        Parameters:
+            hby (Habery): Database environment for exposed KERI AIDs
+            vdb (VerifierBaser): Verifier database environment
+            tvy (Tevery): transaction event log event processor
+            vry (Verifier): credential verification event processor
+
+        """
+        self.hby = hby
+        self.vdb = vdb
+        self.tvy = tvy
+        self.vry = vry
+
+    def on_post(self, req, rep):
+        """  CESR verifier resource POST Method
+
+        Parameters:
+            req: falcon.Request HTTP request
+            rep: falcon.Response HTTP response
+
+        ---
+         summary: Verify CESR data(credential, events) data 
+         description: Verify CESR data(credential, events) data  
+         tags:
+            - verifier
+         parameters:
+           - in: path
+         requestBody:
+             required: true
+             content:
+                application/json+cesr:
+                  schema:
+                    type: application/json
+                    format: text
+         responses:
+           200:
+              description: Verifier result
+
+        """
+        rep.content_type = "application/json"
+
+        try:
+            if req.content_type not in ("application/json+cesr",):
+                rep.status = falcon.HTTP_BAD_REQUEST
+                rep.data = json.dumps(dict(msg=f"Invalid request content-type={req.content_type}")).encode(
+                    "utf-8")
+                return
+
+            ims = req.bounded_stream.read()
+
+            self.vry.cues.clear()
+
+            parsing.Parser().parse(ims=ims,
+                                kvy=self.hby.kvy,
+                                tvy=self.tvy,
+                                vry=self.vry)
+
+            credres = []
+            while self.vry.cues:
+                msg = self.vry.cues.popleft()
+                print(f"msg: {msg}")
+                if "kin" in msg:
+                    if msg["kin"] == "saved":
+                        if "creder" in msg:
+                            credres.append(msg["creder"].sad)
+
+            # if len(credres) == 0:
+            #     rep.status = falcon.HTTP_BAD_REQUEST
+            #     rep.data = json.dumps(dict(msg=f"no credential found in the cesr data")).encode("utf-8")
+            #     return
+                    
+            rep.status = falcon.HTTP_200
+            rep.data = json.dumps(
+                dict(
+                    msg="CESR verified successfully!",
+                    creds=credres  # return the found credentials
+                )
+            ).encode("utf-8")
+            
+        except Exception as ex:
+            rep.status = falcon.HTTP_BAD_REQUEST
+            rep.data = json.dumps(dict(msg=f"CESR verification failed: {ex}")).encode("utf-8")
 
 
 class PresentationResourceEndpoint:
