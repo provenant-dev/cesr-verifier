@@ -1,0 +1,17 @@
+name: Run tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ${{ vars.RUNNER_TYPE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch_name }}
+
+      - name: Tests
+        run: |
+          echo "Test not available!"

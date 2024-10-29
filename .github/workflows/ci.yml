@@ -1,0 +1,30 @@
+name: Build, Tests & Push
+run-name: "${{ github.event.pull_request.title || github.ref }} ${{ inputs.UUID }}"
+
+on:
+  pull_request:
+    types: [ opened, synchronize ]
+    branches: [ dev ]
+  workflow_dispatch:
+    inputs:
+      UUID:
+        required: false
+        type: string
+        description: "UUID of workflow"
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  tests:
+    uses: ./.github/workflows/tests.yml
+    secrets: inherit
+
+  push:
+    needs: build
+    if: ${{ github.event_name != 'pull_request' && !inputs.UUID }}
+    uses: provenant-dev/github-action-helper/.github/workflows/tag-push.yml@main
+    secrets: inherit
+    with:
+      AWS_ENV: 'DEV'
