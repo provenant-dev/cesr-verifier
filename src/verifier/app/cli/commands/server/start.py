@@ -22,6 +22,7 @@ parser.set_defaults(handler=lambda args: launch(args),
 parser.add_argument('-p', '--http',
                     action='store',
                     default=7676,
+                    type=int,
                     help="Port on which to listen for verification requests")
 parser.add_argument('-n', '--name',
                     action='store',

@@ -1,0 +1,25 @@
+name: Run tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ${{ vars.RUNNER_TYPE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+      
+      - name: Run tests
+        run: pytest tests/

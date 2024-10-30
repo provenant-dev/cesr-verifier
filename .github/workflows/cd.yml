@@ -1,0 +1,76 @@
+name: Publish & Deploy
+run-name: "${{ inputs.AWS_ENV || 'DEV' }}: ${{ github.event.pull_request.title || github.ref }} ${{ inputs.UUID }}"
+
+on:
+  pull_request:
+    types: [ closed ]
+    branches: [ dev ]
+
+  workflow_dispatch:
+    inputs:
+      AWS_ENV:
+        required: true
+        default: DEV
+        type: choice
+        description: Environment to Deploy
+        options: [ DEV, STAGE, PROD ]
+      UUID:
+        required: false
+        type: string
+        description: UUID of workflow
+
+env:
+  SVC_NAME: "cesr_verifier"
+
+jobs:
+  setup:
+    if: |
+      (contains(github.event.pull_request.title, '[no-deploy]') == false && github.event.pull_request.merged == true) ||
+      inputs.UUID ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ${{ vars.RUNNER_TYPE }}
+    steps:
+      - run: echo "Dummy"
+    outputs:
+      AWS_ENV: ${{ inputs.AWS_ENV || 'DEV' }}
+      SVC_NAME: ${{ env.SVC_NAME }}
+
+  build:
+    needs: setup
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  tag-push:
+    name: ${{ needs.setup.outputs.AWS_ENV }}
+    needs: [ setup, build ]
+    uses: provenant-dev/github-action-helper/.github/workflows/tag-push.yml@main
+    secrets: inherit
+    with:
+      AWS_ENV: ${{ needs.setup.outputs.AWS_ENV }}
+
+  set-version:
+    name: ${{ needs.setup.outputs.AWS_ENV }}
+    needs: [ setup, tag-push ]
+    uses: provenant-dev/github-action-helper/.github/workflows/set-version.yml@main
+    secrets: inherit
+    with:
+      DEPLOY_ENV: ${{ needs.setup.outputs.AWS_ENV }}
+      RELEASE_VERSION: ${{ needs.tag-push.outputs.RELEASE_VERSION }}
+      SVC_NAME: ${{ needs.setup.outputs.SVC_NAME }}
+
+  publish:
+    name: ${{ needs.setup.outputs.AWS_ENV }}
+    needs: [ setup, tag-push ]
+    uses: provenant-dev/github-action-helper/.github/workflows/publish.yml@main
+    secrets: inherit
+    with:
+      AWS_ENV: ${{ needs.setup.outputs.AWS_ENV }}
+      RELEASE_VERSION: ${{ needs.tag-push.outputs.RELEASE_VERSION }}
+
+  deploy:
+    name: ${{ needs.setup.outputs.AWS_ENV }}
+    needs: [ setup, publish, set-version ]
+    uses: provenant-dev/github-action-helper/.github/workflows/deploy-helm.yml@main
+    secrets: inherit
+    with:
+      AWS_ENV: ${{ needs.setup.outputs.AWS_ENV }}

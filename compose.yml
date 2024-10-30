@@ -1,0 +1,8 @@
+services:
+  cesr-verifier:
+    image: provenant/cesr-verifier:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 10100:10100

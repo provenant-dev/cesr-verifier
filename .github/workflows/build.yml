@@ -1,0 +1,24 @@
+name: "-"
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ github.job.name }}
+    runs-on: ${{ vars.RUNNER_TYPE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          docker build --file Dockerfile -t ${{ github.sha }} .
+          docker save -o /tmp/${{ github.sha }}.tar ${{ github.sha }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.sha }}
+          path: /tmp/${{ github.sha }}.tar
+          retention-days: 1
