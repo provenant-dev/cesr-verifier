@@ -36,7 +36,7 @@ def test_setup_verifying(seeder):
         # Create a test client
         client = falcon.testing.TestClient(app)
         # Define the said and the credential
-        result = client.simulate_put(f'/presentations/{said}',
+        result = client.simulate_put(f'/v1/cesr-verifier/presentations/{said}',
                                         body=acdc,
                                         headers={'Content-Type': 'application/json+cesr'})
         assert result.status == falcon.HTTP_202
@@ -81,7 +81,7 @@ def test_ecr(seeder):
         # Create a test client
         client = falcon.testing.TestClient(app)
         # Define the said and the credential
-        result = client.simulate_put(f'/presentations/{ecsaid}',
+        result = client.simulate_put(f'/v1/cesr-verifier/presentations/{ecsaid}',
                                         body=acdc,
                                         headers={'Content-Type': 'application/json+cesr'})
         assert result.status == falcon.HTTP_202
@@ -124,14 +124,14 @@ def test_ecr_missing(seeder):
         # Create a test client
         client = falcon.testing.TestClient(app)
         # Define the said and the credential
-        result = client.simulate_put(f'/presentations/{easaid}',
+        result = client.simulate_put(f'/v1/cesr-verifier/presentations/{easaid}',
                                         body=acdc,
                                         headers={'Content-Type': 'application/json+cesr'})
         assert result.status == falcon.HTTP_400
 
         issAndCred.extend(eamsgs)
         acdc = issAndCred.decode("utf-8")
-        result = client.simulate_put(f'/presentations/{easaid}',
+        result = client.simulate_put(f'/v1/cesr-verifier/presentations/{easaid}',
                                         body=acdc,
                                         headers={'Content-Type': 'application/json'})
         assert result.status == falcon.HTTP_400
