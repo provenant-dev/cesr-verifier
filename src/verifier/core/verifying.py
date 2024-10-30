@@ -37,9 +37,9 @@ def loadEnds(app, hby, vdb, tvy, vry):
     healthEnd = HealthEndpoint()
     app.add_route("/health", healthEnd)
     credEnd = PresentationResourceEndpoint(hby, vdb, tvy, vry)
-    app.add_route("/presentations/{said}", credEnd)
+    app.add_route("/v1/cesr-verifier/presentations/{said}", credEnd)
     verifierEnd = VerifierResourceEndpoint(hby, vdb, tvy, vry)
-    app.add_route("/verifier", verifierEnd)
+    app.add_route("/v1/cesr-verifier/verifier", verifierEnd)
     return []
 
 

@@ -16,12 +16,12 @@ verifier server start --config-dir scripts --config-file verifier-config.json
 
 
 ## API
-PUT `/presentations/{said}` with the CESR material in the body. Examples:
+PUT `/v1/cesr-verifier/presentations/{said}` with the CESR material in the body. Examples:
 
 ```
-curl -X PUT http://localhost:7676/presentations/EFgXpBg0WwFqdnCV0lHfZqjP-ZAlO4XBgF1fSi8e_ZeB -vvvv -H "Content-Type: application/json+cesr" --data "@./tests/data/credential/EFgXpBg0WwFqdnCV0lHfZqjP-ZAlO4XBgF1fSi8e_ZeB.cesr"
+curl -X PUT http://localhost:7676/v1/cesr-verifier/presentations/EFgXpBg0WwFqdnCV0lHfZqjP-ZAlO4XBgF1fSi8e_ZeB -vvvv -H "Content-Type: application/json+cesr" --data "@./tests/data/credential/EFgXpBg0WwFqdnCV0lHfZqjP-ZAlO4XBgF1fSi8e_ZeB.cesr"
 
-curl -X PUT http://localhost:7676/presentations/EKLZNI1s8U0PCGG1XtjIX6VV-O6GCtdv1qpFPlEzZJuO -vvvv -H "Content-Type: application/json+cesr" --data "@./tests/data/credential/EKLZNI1s8U0PCGG1XtjIX6VV-O6GCtdv1qpFPlEzZJuO.cesr"
+curl -X PUT http://localhost:7676/v1/cesr-verifier/presentations/EKLZNI1s8U0PCGG1XtjIX6VV-O6GCtdv1qpFPlEzZJuO -vvvv -H "Content-Type: application/json+cesr" --data "@./tests/data/credential/EKLZNI1s8U0PCGG1XtjIX6VV-O6GCtdv1qpFPlEzZJuO.cesr"
 ```
 
 ## State of the Application
