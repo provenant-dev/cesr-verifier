@@ -15,6 +15,7 @@ on:
 jobs:
   build:
     uses: ./.github/workflows/build.yml
+    if: ${{ github.event_name != 'pull_request' && !inputs.UUID }}
     secrets: inherit
 
   tests:
