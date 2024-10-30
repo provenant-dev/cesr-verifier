@@ -12,6 +12,14 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch_name }}
 
-      - name: Tests
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
         run: |
-          echo "Test not available!"
+          pip install -r requirements.txt
+          pip install pytest
+      
+      - name: Run tests
+        run: pytest tests/

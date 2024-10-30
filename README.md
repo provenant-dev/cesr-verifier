@@ -24,5 +24,5 @@ curl -X PUT http://localhost:7676/presentations/EFgXpBg0WwFqdnCV0lHfZqjP-ZAlO4XB
 curl -X PUT http://localhost:7676/presentations/EKLZNI1s8U0PCGG1XtjIX6VV-O6GCtdv1qpFPlEzZJuO -vvvv -H "Content-Type: application/json+cesr" --data "@./tests/data/credential/EKLZNI1s8U0PCGG1XtjIX6VV-O6GCtdv1qpFPlEzZJuO.cesr"
 ```
 
-
-
+## State of the Application
+This service writes data into disk as part of verifying the data. However, we will not consider it a stateful application as those are temporary data.

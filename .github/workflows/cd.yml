@@ -20,7 +20,7 @@ on:
         description: UUID of workflow
 
 env:
-  SVC_NAME: "gleif_notifier"
+  SVC_NAME: "cesr_verifier"
 
 jobs:
   setup:
