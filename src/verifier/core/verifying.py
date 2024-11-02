@@ -73,8 +73,8 @@ class VerifierResourceEndpoint:
             rep: falcon.Response HTTP response
 
         ---
-         summary: Verify CESR data(credential, events) data 
-         description: Verify CESR data(credential, events) data  
+         summary: Verify CESR data(credential, events) data, return the found credentials in the CESR data
+         description: Verify CESR data(credential, events) data, return the found credentials in the CESR data  
          tags:
             - verifier
          parameters:
@@ -89,6 +89,16 @@ class VerifierResourceEndpoint:
          responses:
            200:
               description: Verifier result
+              content: 
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      creds:
+                        type: array
+                        items:
+                          type: string
+                        description: saved credentials from the CESR data
 
         """
         rep.content_type = "application/json"
@@ -126,7 +136,6 @@ class VerifierResourceEndpoint:
             rep.status = falcon.HTTP_200
             rep.data = json.dumps(
                 dict(
-                    msg="CESR verified successfully!",
                     creds=credres  # return the found credentials
                 )
             ).encode("utf-8")
