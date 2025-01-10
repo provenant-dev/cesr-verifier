@@ -58,19 +58,10 @@ jobs:
       RELEASE_VERSION: ${{ needs.tag-push.outputs.RELEASE_VERSION }}
       SVC_NAME: ${{ needs.setup.outputs.SVC_NAME }}
 
-  publish:
-    name: ${{ needs.setup.outputs.AWS_ENV }}
-    needs: [ setup, tag-push ]
-    uses: provenant-dev/github-action-helper/.github/workflows/publish.yml@main
-    secrets: inherit
-    with:
-      AWS_ENV: ${{ needs.setup.outputs.AWS_ENV }}
-      RELEASE_VERSION: ${{ needs.tag-push.outputs.RELEASE_VERSION }}
-
   deploy:
     name: ${{ needs.setup.outputs.AWS_ENV }}
-    needs: [ setup, publish, set-version ]
-    uses: provenant-dev/github-action-helper/.github/workflows/deploy-helm.yml@main
+    needs: [ setup, set-version ]
+    uses: provenant-dev/github-action-helper/.github/workflows/initiate-deployment.yml@main
     secrets: inherit
     with:
-      AWS_ENV: ${{ needs.setup.outputs.AWS_ENV }}
+      DEPLOY_ENV: ${{ needs.setup.outputs.AWS_ENV }}
