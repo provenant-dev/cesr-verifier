@@ -8,7 +8,7 @@ jobs:
   tests:
     runs-on: ${{ vars.RUNNER_TYPE }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.branch_name }}
       
