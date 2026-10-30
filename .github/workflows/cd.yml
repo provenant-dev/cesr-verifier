@@ -12,7 +12,6 @@ on:
         required: false
         type: string
         description: "Branch or tag to build"
-        default: "dev"
       AWS_ENV:
         required: true
         default: DEV
@@ -21,7 +20,7 @@ on:
       UUID:
         required: false
         type: string
-        description: UUID of workflow
+        description: "Automation only. Leave empty"
 
 jobs:
   # Skips the whole chain when a deploy freeze is active, before any image is built.
@@ -41,7 +40,7 @@ jobs:
     uses: ./.github/workflows/publish.yml
     secrets: inherit
     with:
-      REPO_REF: ${{ inputs.REPO_REF || github.ref }}
+      REPO_REF: ${{ inputs.REPO_REF || github.event.pull_request.merge_commit_sha || github.ref }}
       AWS_ENV: ${{ inputs.AWS_ENV || 'DEV' }}
 
   set-version:

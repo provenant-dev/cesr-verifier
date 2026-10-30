@@ -2,8 +2,13 @@ name: Publish
 run-name: "${{ inputs.AWS_ENV || 'DEV' }}: publish ${{ inputs.REPO_REF || github.ref_name }} ${{ inputs.UUID }}"
 
 # Builds, scans and pushes the service image to ECR without deploying it.
-# Dispatch it to get an image of any branch or commit for testing; cd.yml calls
-# it before set-version and deploy.
+# cd.yml calls it before set-version and deploy.
+#
+# Manual use: Actions -> Publish -> Run workflow. Pick the branch in
+# "Use workflow from" and leave REPO_REF empty. To build a branch that does not
+# contain this file yet, a tag or a commit, keep "Use workflow from" on the
+# default branch and put the ref in REPO_REF. The image is pushed as
+# <repo>:<first 7 characters of the commit SHA>.
 
 on:
   workflow_dispatch:
@@ -11,16 +16,16 @@ on:
       REPO_REF:
         required: false
         type: string
-        description: "Branch, tag or commit to build"
+        description: "Optional. Branch, tag or SHA to build. Leave empty to build the branch picked in \"Use workflow from\""
       AWS_ENV:
         required: true
         default: DEV
         type: string
-        description: Environment whose ECR receives the image
+        description: "ECR to push the image to. Keep DEV unless you are releasing"
       UUID:
         required: false
         type: string
-        description: UUID of workflow
+        description: "Automation only. Leave empty"
 
   workflow_call:
     inputs:
@@ -51,10 +56,12 @@ jobs:
 
       - name: Get commit SHA
         id: get-sha
+        env:
+          REPO_REF: ${{ inputs.REPO_REF || github.ref }}
         run: |
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "COMMIT_SHA=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "Commit SHA for REPO_REF '${{ inputs.REPO_REF || github.ref }}': ${COMMIT_SHA}"
+          echo "Commit SHA for REPO_REF '${REPO_REF}': ${COMMIT_SHA}"
     outputs:
       AWS_ENV: ${{ inputs.AWS_ENV || 'DEV' }}
       COMMIT_SHA: ${{ steps.get-sha.outputs.COMMIT_SHA }}
