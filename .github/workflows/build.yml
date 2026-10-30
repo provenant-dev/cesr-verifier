@@ -2,23 +2,71 @@ name: "-"
 
 on:
   workflow_call:
+    inputs:
+      REPO_REF:
+        required: false
+        type: string
+        description: "Branch or tag to build"
+    outputs:
+      COMMIT_SHA: 
+        value: ${{ jobs.build.outputs.COMMIT_SHA }}
+        description: "The actual commit SHA that was built"
   workflow_dispatch:
+    inputs:
+      REPO_REF:
+        required: false
+        type: string
+        description: "Branch or tag to build"
 
 jobs:
   build:
     name: ${{ github.job.name }}
     runs-on: ${{ vars.RUNNER_TYPE }}
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      COMMIT_SHA: ${{ steps.get-sha.outputs.COMMIT_SHA }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+        with:
+          ref: ${{ inputs.REPO_REF || github.ref }}
+      
+      - name: Get actual commit SHA
+        id: get-sha
+        run: |
+          COMMIT_SHA=$(git rev-parse HEAD)
+          echo "COMMIT_SHA=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Building commit: ${COMMIT_SHA}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885  # v6
+        with:
+          role-to-assume: ${{ vars.DEV_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@fa648b43de3d4d023bcb3f89ed6940096949c419  # v2
+
+      - name: Set up Docker Buildx
+        run: |
+          docker buildx create --name mybuilder --use --bootstrap --driver-opt image=${{ steps.login-ecr.outputs.registry }}/docker-hub/moby/buildkit:latest
 
       - name: Build image
+        env:
+          COMMIT_SHA: ${{ steps.get-sha.outputs.COMMIT_SHA }}
         run: |
-          docker build --file Dockerfile -t ${{ github.sha }} .
-          docker save -o /tmp/${{ github.sha }}.tar ${{ github.sha }}
+          sed -i "s|public.ecr.aws|${{ steps.login-ecr.outputs.registry }}/ecr-public|g" Dockerfile
+          docker buildx build \
+          --cache-from type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_BUILD_CACHE_REPO }}:${{ github.event.repository.name }} \
+          --cache-to type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_BUILD_CACHE_REPO }}:${{ github.event.repository.name }},mode=max \
+          --output type=docker,dest=/tmp/"${COMMIT_SHA}".tar \
+          -t "${COMMIT_SHA}" \
+          .
 
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
-          name: ${{ github.sha }}
-          path: /tmp/${{ github.sha }}.tar
+          name: ${{ steps.get-sha.outputs.COMMIT_SHA }}
+          path: /tmp/${{ steps.get-sha.outputs.COMMIT_SHA }}.tar
           retention-days: 1

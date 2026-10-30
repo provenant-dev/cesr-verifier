@@ -8,60 +8,55 @@ on:
 
   workflow_dispatch:
     inputs:
+      REPO_REF:
+        required: false
+        type: string
+        description: "Branch or tag to build"
       AWS_ENV:
         required: true
         default: DEV
-        type: choice
+        type: string
         description: Environment to Deploy
-        options: [ DEV, STAGE, PROD ]
       UUID:
         required: false
         type: string
-        description: UUID of workflow
-
-env:
-  SVC_NAME: "cesr_verifier"
+        description: "Automation only. Leave empty"
 
 jobs:
-  setup:
+  # Skips the whole chain when a deploy freeze is active, before any image is built.
+  preflight:
     if: |
       (contains(github.event.pull_request.title, '[no-deploy]') == false && github.event.pull_request.merged == true) ||
       inputs.UUID ||
       github.event_name == 'workflow_dispatch'
-    runs-on: ${{ vars.RUNNER_TYPE }}
-    steps:
-      - run: echo "Dummy"
-    outputs:
-      AWS_ENV: ${{ inputs.AWS_ENV || 'DEV' }}
-      SVC_NAME: ${{ env.SVC_NAME }}
-
-  build:
-    needs: setup
-    uses: ./.github/workflows/build.yml
-    secrets: inherit
-
-  tag-push:
-    name: ${{ needs.setup.outputs.AWS_ENV }}
-    needs: [ setup, build ]
-    uses: provenant-dev/github-action-helper/.github/workflows/tag-push.yml@main
+    uses: provenant-dev/github-action-helper/.github/workflows/preflight-deploy.yml@main
     secrets: inherit
     with:
-      AWS_ENV: ${{ needs.setup.outputs.AWS_ENV }}
+      DEPLOY_ENV: ${{ inputs.AWS_ENV || 'DEV' }}
+
+  publish:
+    needs: preflight
+    if: needs.preflight.outputs.can_deploy == 'true'
+    uses: ./.github/workflows/publish.yml
+    secrets: inherit
+    with:
+      REPO_REF: ${{ inputs.REPO_REF || github.event.pull_request.merge_commit_sha || github.ref }}
+      AWS_ENV: ${{ inputs.AWS_ENV || 'DEV' }}
 
   set-version:
-    name: ${{ needs.setup.outputs.AWS_ENV }}
-    needs: [ setup, tag-push ]
+    name: ${{ inputs.AWS_ENV || 'DEV' }}
+    needs: publish
     uses: provenant-dev/github-action-helper/.github/workflows/set-version.yml@main
     secrets: inherit
     with:
-      DEPLOY_ENV: ${{ needs.setup.outputs.AWS_ENV }}
-      RELEASE_VERSION: ${{ needs.tag-push.outputs.RELEASE_VERSION }}
-      SVC_NAME: ${{ needs.setup.outputs.SVC_NAME }}
+      DEPLOY_ENV: ${{ inputs.AWS_ENV || 'DEV' }}
+      RELEASE_VERSION: ${{ needs.publish.outputs.RELEASE_VERSION }}
+      SVC_NAME: "cesr_verifier"
 
   deploy:
-    name: ${{ needs.setup.outputs.AWS_ENV }}
-    needs: [ setup, set-version ]
+    name: ${{ inputs.AWS_ENV || 'DEV' }}
+    needs: set-version
     uses: provenant-dev/github-action-helper/.github/workflows/initiate-deployment.yml@main
     secrets: inherit
     with:
-      DEPLOY_ENV: ${{ needs.setup.outputs.AWS_ENV }}
+      DEPLOY_ENV: ${{ inputs.AWS_ENV || 'DEV' }}

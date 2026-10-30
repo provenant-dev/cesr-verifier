@@ -1,0 +1,107 @@
+name: Publish
+run-name: "${{ inputs.AWS_ENV || 'DEV' }}: publish ${{ inputs.REPO_REF || github.ref_name }} ${{ inputs.UUID }}"
+
+# Builds, scans and pushes the service image to ECR without deploying it.
+# cd.yml calls it before set-version and deploy.
+#
+# Manual use: Actions -> Publish -> Run workflow. Pick the branch in
+# "Use workflow from" and leave REPO_REF empty. To build a branch that does not
+# contain this file yet, a tag or a commit, keep "Use workflow from" on the
+# default branch and put the ref in REPO_REF. The image is pushed as
+# <repo>:<first 7 characters of the commit SHA>.
+
+on:
+  workflow_dispatch:
+    inputs:
+      REPO_REF:
+        required: false
+        type: string
+        description: "Optional. Branch, tag or SHA to build. Leave empty to build the branch picked in \"Use workflow from\""
+      AWS_ENV:
+        required: true
+        default: DEV
+        type: string
+        description: "ECR to push the image to. Keep DEV unless you are releasing"
+      UUID:
+        required: false
+        type: string
+        description: "Automation only. Leave empty"
+
+  workflow_call:
+    inputs:
+      REPO_REF:
+        required: false
+        type: string
+        description: "Branch, tag or commit to build"
+      AWS_ENV:
+        required: false
+        default: DEV
+        type: string
+        description: Environment whose ECR receives the image
+    outputs:
+      COMMIT_SHA:
+        value: ${{ jobs.setup.outputs.COMMIT_SHA }}
+        description: "The commit that was built"
+      RELEASE_VERSION:
+        value: ${{ jobs.tag-push.outputs.RELEASE_VERSION }}
+        description: "The image tag pushed to ECR"
+
+jobs:
+  setup:
+    runs-on: ${{ vars.RUNNER_TYPE }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+        with:
+          ref: ${{ inputs.REPO_REF || github.ref }}
+
+      - name: Get commit SHA
+        id: get-sha
+        env:
+          REPO_REF: ${{ inputs.REPO_REF || github.ref }}
+        run: |
+          COMMIT_SHA=$(git rev-parse HEAD)
+          echo "COMMIT_SHA=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Commit SHA for REPO_REF '${REPO_REF}': ${COMMIT_SHA}"
+    outputs:
+      AWS_ENV: ${{ inputs.AWS_ENV || 'DEV' }}
+      COMMIT_SHA: ${{ steps.get-sha.outputs.COMMIT_SHA }}
+      REPO_REF: ${{ inputs.REPO_REF || github.ref }}
+
+  check-image:
+    uses: provenant-dev/github-action-helper/.github/workflows/check-image.yml@main
+    needs: setup
+    secrets: inherit
+    with:
+      DEPLOY_ENV: ${{ needs.setup.outputs.AWS_ENV }}
+      COMMIT_HASH: ${{ needs.setup.outputs.COMMIT_SHA }}
+
+  build:
+    needs: [ setup, check-image ]
+    if: needs.check-image.outputs.IMAGE_EXISTS != 'true'
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      REPO_REF: ${{ needs.setup.outputs.COMMIT_SHA }}
+
+  vulnerability-scan:
+    needs: [setup, build]
+    uses: provenant-dev/github-action-helper/.github/workflows/vulnerability-scan-image.yml@main
+    secrets: inherit
+    permissions:
+      contents: write # POST built-image SBOM to GH Dependency Graph
+      id-token: write # OIDC -> ECR for Trivy DB pull
+    with:
+      IMAGE_ARTIFACT: ${{ needs.setup.outputs.COMMIT_SHA }}
+
+  tag-push:
+    name: ${{ needs.setup.outputs.AWS_ENV }}
+    needs: [ setup, check-image, build ]
+    # Runs when the build was skipped because the image already exists.
+    if: ${{ always() && needs.setup.result == 'success' && !failure() && !cancelled() }}
+    uses: provenant-dev/github-action-helper/.github/workflows/tag-push.yml@main
+    secrets: inherit
+    with:
+      AWS_ENV: ${{ needs.setup.outputs.AWS_ENV }}
+      IMAGE_EXISTS: ${{ needs.check-image.outputs.IMAGE_EXISTS }}
+      IMAGE_TAG: ${{ needs.setup.outputs.COMMIT_SHA }}
+      REPO_REF: ${{ needs.setup.outputs.REPO_REF }}
