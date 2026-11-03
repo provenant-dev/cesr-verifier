@@ -7,10 +7,18 @@ on:
         required: false
         type: string
         description: "Branch or tag to build"
+      PUSH_IMAGE:
+        required: false
+        type: boolean
+        default: false
+        description: "Push the image to ECR as <repository>:<sha7> instead of uploading a tar artifact"
     outputs:
       COMMIT_SHA: 
         value: ${{ jobs.build.outputs.COMMIT_SHA }}
         description: "The actual commit SHA that was built"
+      IMAGE_TAG:
+        value: ${{ jobs.build.outputs.IMAGE_TAG }}
+        description: "ECR tag of the pushed image (PUSH_IMAGE only)"
   workflow_dispatch:
     inputs:
       REPO_REF:
@@ -27,6 +35,7 @@ jobs:
       contents: read
     outputs:
       COMMIT_SHA: ${{ steps.get-sha.outputs.COMMIT_SHA }}
+      IMAGE_TAG: ${{ steps.get-sha.outputs.IMAGE_TAG }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
         with:
@@ -37,6 +46,7 @@ jobs:
         run: |
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "COMMIT_SHA=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_TAG=${COMMIT_SHA:0:7}" >> $GITHUB_OUTPUT
           echo "Building commit: ${COMMIT_SHA}"
 
       - name: Configure AWS credentials
@@ -55,16 +65,23 @@ jobs:
       - name: Build image
         env:
           COMMIT_SHA: ${{ steps.get-sha.outputs.COMMIT_SHA }}
+          IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ github.event.repository.name }}:${{ steps.get-sha.outputs.IMAGE_TAG }}
+          PUSH_IMAGE: ${{ inputs.PUSH_IMAGE }}
         run: |
+          if [ "$PUSH_IMAGE" = "true" ]; then
+            OUTPUT="--output type=image,name=${IMAGE},push=true"
+          else
+            OUTPUT="--output type=docker,dest=/tmp/${COMMIT_SHA}.tar -t ${COMMIT_SHA}"
+          fi
           sed -i "s|public.ecr.aws|${{ steps.login-ecr.outputs.registry }}/ecr-public|g" Dockerfile
           docker buildx build \
           --cache-from type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_BUILD_CACHE_REPO }}:${{ github.event.repository.name }} \
           --cache-to type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_BUILD_CACHE_REPO }}:${{ github.event.repository.name }},mode=max \
-          --output type=docker,dest=/tmp/"${COMMIT_SHA}".tar \
-          -t "${COMMIT_SHA}" \
+          ${OUTPUT} \
           .
 
       - name: Upload artifact
+        if: ${{ !inputs.PUSH_IMAGE }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
           name: ${{ steps.get-sha.outputs.COMMIT_SHA }}

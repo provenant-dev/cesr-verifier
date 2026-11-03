@@ -82,6 +82,7 @@ jobs:
     secrets: inherit
     with:
       REPO_REF: ${{ needs.setup.outputs.COMMIT_SHA }}
+      PUSH_IMAGE: ${{ needs.setup.outputs.AWS_ENV == 'DEV' }}
 
   vulnerability-scan:
     needs: [setup, build]
@@ -92,6 +93,8 @@ jobs:
       id-token: write # OIDC -> ECR for Trivy DB pull
     with:
       IMAGE_ARTIFACT: ${{ needs.setup.outputs.COMMIT_SHA }}
+      IMAGE_SOURCE: ${{ needs.setup.outputs.AWS_ENV == 'DEV' && 'registry' || 'artifact' }}
+      IMAGE_TAG: ${{ needs.build.outputs.IMAGE_TAG }}
 
   tag-push:
     name: ${{ needs.setup.outputs.AWS_ENV }}
@@ -105,3 +108,4 @@ jobs:
       IMAGE_EXISTS: ${{ needs.check-image.outputs.IMAGE_EXISTS }}
       IMAGE_TAG: ${{ needs.setup.outputs.COMMIT_SHA }}
       REPO_REF: ${{ needs.setup.outputs.REPO_REF }}
+      IMAGE_SOURCE: ${{ needs.setup.outputs.AWS_ENV == 'DEV' && 'registry' || 'artifact' }}
